@@ -3,13 +3,14 @@ import { join } from "path";
 import { Resolvers } from "../../apollo/__generated__/server/resolvers-types";
 import { startServerAndCreateNextHandler } from '@as-integrations/next';
 import { ApolloServer } from '@apollo/server';
-// import { PrismaClient } from "@prisma/client/extension";
+import { PrismaClient } from "@prisma/client";
+import { NextRequest } from "next/server";
 
-// const prisma = new PrismaClient();
+const prisma = new PrismaClient();
 
-// type Context = {
-//   prisma: PrismaClient;
-// }
+type Context = {
+  prisma: PrismaClient;
+}
 
 const typeDefs = readFileSync(
   join(process.cwd(), "/src/app/apollo/documents/schema.gql"),
@@ -18,8 +19,12 @@ const typeDefs = readFileSync(
 
 const resolvers: Resolvers = {
   Query: {
-    users() {
-      return [{ name: "Nextjs", email:'emon@exmaple.com' }, { name: "Nuxtjs", email:'kanta@exmaple.com' }, { name: "Sveltekit", email:'satoshi@exmaple.com' }];
+    users: async (_: unknown, args: any, context: Context) =>  { 
+      const user = await context.prisma.user.findMany({})
+      const response = user.map((v) => {
+        return {name: v.name, email: 'email!@example.com'}
+      })
+      return response;
     },
   },
   Mutation: {
@@ -31,12 +36,17 @@ const resolvers: Resolvers = {
   },
 };
 
-const server = new ApolloServer({
+const server = new ApolloServer<Context>({
   typeDefs,
   resolvers,
 });
 
 
-const handler = startServerAndCreateNextHandler(server);
+const handler = startServerAndCreateNextHandler<NextRequest, Context>(server, {
+  context: async ({ req }) => ({
+    req,
+    prisma,
+  }),
+});
 
 export { handler as GET, handler as POST };
